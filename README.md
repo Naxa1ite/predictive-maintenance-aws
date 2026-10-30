@@ -19,7 +19,6 @@ High scores partly reflect that AI4I failures are generated from physical rules;
 | `frontend/` | React + Vite dashboard (plain CSS, Recharts) |
 | `simulator/` | synthetic scenario generator (CLI; the dashboard has the same controls) |
 | `scripts/` | train, deploy, deploy_frontend, cleanup |
-| `docs/` | architecture, api, aws-deployment, testing, project-report, demo-script, final-review PPTX, screenshots |
 
 ## Run locally (no AWS needed)
 
