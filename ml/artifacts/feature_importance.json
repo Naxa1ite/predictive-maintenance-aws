@@ -1,0 +1,13 @@
+{
+  "rotational_speed": 0.2279,
+  "torque": 0.1935,
+  "power_w": 0.1706,
+  "tool_wear": 0.1203,
+  "wear_torque": 0.1106,
+  "temp_diff": 0.0882,
+  "air_temperature": 0.0475,
+  "process_temperature": 0.0307,
+  "type_M": 0.0043,
+  "type_L": 0.0038,
+  "type_H": 0.0024
+}

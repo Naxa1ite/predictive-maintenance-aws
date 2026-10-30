@@ -1,0 +1,148 @@
+{
+  "model_version": "rf-20261021-06bc0151",
+  "trained_at": "2026-10-21T19:13:27.085319+00:00",
+  "seed": 42,
+  "dataset": {
+    "rows": 10000,
+    "failures": 339,
+    "failure_rate": 0.0339,
+    "split": {
+      "train": 6000,
+      "validation": 2000,
+      "test": 2000
+    }
+  },
+  "decision_threshold": 0.48,
+  "medium_threshold": 0.24,
+  "threshold_rule": "maximise F2 on the validation split; medium risk starts at half the decision threshold",
+  "deployed_model": "random_forest",
+  "test": {
+    "threshold": 0.48,
+    "precision": 0.8852459016393442,
+    "recall": 0.7941176470588235,
+    "f1": 0.8372093023255814,
+    "roc_auc": 0.9817051820728291,
+    "pr_auc": 0.8745718665984215,
+    "confusion_matrix": {
+      "tn": 1925,
+      "fp": 7,
+      "fn": 14,
+      "tp": 54
+    },
+    "n_samples": 2000,
+    "n_failures": 68
+  },
+  "comparison": {
+    "random_forest": {
+      "validation": {
+        "threshold": 0.48,
+        "precision": 0.9322033898305084,
+        "recall": 0.8088235294117647,
+        "f1": 0.8661417322834646,
+        "roc_auc": 0.9552011021800024,
+        "pr_auc": 0.843952715842297,
+        "confusion_matrix": {
+          "tn": 1928,
+          "fp": 4,
+          "fn": 13,
+          "tp": 55
+        },
+        "n_samples": 2000,
+        "n_failures": 68
+      },
+      "test": {
+        "threshold": 0.48,
+        "precision": 0.8852459016393442,
+        "recall": 0.7941176470588235,
+        "f1": 0.8372093023255814,
+        "roc_auc": 0.9817051820728291,
+        "pr_auc": 0.8745718665984215,
+        "confusion_matrix": {
+          "tn": 1925,
+          "fp": 7,
+          "fn": 14,
+          "tp": 54
+        },
+        "n_samples": 2000,
+        "n_failures": 68
+      }
+    },
+    "logistic_regression": {
+      "validation": {
+        "threshold": 0.72,
+        "precision": 0.28160919540229884,
+        "recall": 0.7205882352941176,
+        "f1": 0.4049586776859504,
+        "roc_auc": 0.918790342223846,
+        "pr_auc": 0.42115337049867346,
+        "confusion_matrix": {
+          "tn": 1807,
+          "fp": 125,
+          "fn": 19,
+          "tp": 49
+        },
+        "n_samples": 2000,
+        "n_failures": 68
+      },
+      "test": {
+        "threshold": 0.72,
+        "precision": 0.32575757575757575,
+        "recall": 0.6323529411764706,
+        "f1": 0.43,
+        "roc_auc": 0.9253897211058336,
+        "pr_auc": 0.41195704638702224,
+        "confusion_matrix": {
+          "tn": 1843,
+          "fp": 89,
+          "fn": 25,
+          "tp": 43
+        },
+        "n_samples": 2000,
+        "n_failures": 68
+      }
+    },
+    "gradient_boosting": {
+      "validation": {
+        "threshold": 0.14,
+        "precision": 0.8888888888888888,
+        "recall": 0.8235294117647058,
+        "f1": 0.8549618320610687,
+        "roc_auc": 0.9675321215442698,
+        "pr_auc": 0.8846729173431512,
+        "confusion_matrix": {
+          "tn": 1925,
+          "fp": 7,
+          "fn": 12,
+          "tp": 56
+        },
+        "n_samples": 2000,
+        "n_failures": 68
+      },
+      "test": {
+        "threshold": 0.14,
+        "precision": 0.8309859154929577,
+        "recall": 0.8676470588235294,
+        "f1": 0.8489208633093526,
+        "roc_auc": 0.9897203446596029,
+        "pr_auc": 0.9178125522260535,
+        "confusion_matrix": {
+          "tn": 1920,
+          "fp": 12,
+          "fn": 9,
+          "tp": 59
+        },
+        "n_samples": 2000,
+        "n_failures": 68
+      }
+    }
+  },
+  "excluded_columns": [
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF",
+    "UDI",
+    "Product ID"
+  ]
+}

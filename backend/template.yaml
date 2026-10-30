@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Predictive maintenance prototype (Lambda + HTTP API + DynamoDB + SNS + S3). Academic use only.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: pm-aws
+    AllowedPattern: '^[a-z0-9-]{3,20}$'
+    Description: Prefix for resource names (lowercase letters, digits, hyphens).
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: Email for high-risk alerts. Leave empty to subscribe manually later. The recipient must confirm the subscription email.
+  AlertThreshold:
+    Type: String
+    Default: ''
+    Description: Probability (0-1) at/above which an alert is sent. Empty = use the model's decision threshold.
+  AlertCooldownMinutes:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    Description: Minimum minutes between repeated alerts for a machine that stays high-risk.
+  CorsOrigin:
+    Type: String
+    Default: '*'
+    Description: Allowed browser origin for the API (use the frontend URL once known).
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    Timeout: 10
+    MemorySize: 256
+    CodeUri: src/
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref PredictionsTable
+        ALERT_TOPIC_ARN: !Ref AlertTopic
+        ALERT_THRESHOLD: !Ref AlertThreshold
+        ALERT_COOLDOWN_MINUTES: !Ref AlertCooldownMinutes
+
+Resources:
+  # ---------- Storage ----------
+  PredictionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${ProjectName}-predictions'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: pk, AttributeType: S}
+        - {AttributeName: sk, AttributeType: S}
+        - {AttributeName: gsi1pk, AttributeType: S}
+        - {AttributeName: gsi1sk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: pk, KeyType: HASH}
+        - {AttributeName: sk, KeyType: RANGE}
+      GlobalSecondaryIndexes:
+        - IndexName: gsi1
+          KeySchema:
+            - {AttributeName: gsi1pk, KeyType: HASH}
+            - {AttributeName: gsi1sk, KeyType: RANGE}
+          Projection: {ProjectionType: ALL}
+      SSESpecification: {SSEEnabled: true}
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Sub '${ProjectName}-data-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Sub '${ProjectName}-web-${AWS::AccountId}-${AWS::Region}'
+      WebsiteConfiguration: {IndexDocument: index.html, ErrorDocument: index.html}
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: false, IgnorePublicAcls: true, RestrictPublicBuckets: false}
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadStaticSite
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+
+  # ---------- Notifications ----------
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${ProjectName}-alerts'
+      DisplayName: Predictive Maintenance Alerts
+
+  AlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  # ---------- API ----------
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: [!Ref CorsOrigin]
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
+        AllowHeaders: [Content-Type]
+        MaxAge: 600
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  # ---------- Functions ----------
+  PredictFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: PredictLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-predict'
+      Handler: predict.app.handler
+      Description: Validate, run the Random Forest model, store the prediction, send alerts.
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:GetItem]
+              Resource: !GetAtt PredictionsTable.Arn
+            - Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref AlertTopic
+      Events:
+        Predict:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Method: POST, Path: /predict}
+
+  HistoryFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: HistoryLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-history'
+      Handler: history.app.handler
+      Description: Prediction history, high-risk events and maintenance status updates.
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: [dynamodb:Query, dynamodb:UpdateItem]
+              Resource:
+                - !GetAtt PredictionsTable.Arn
+                - !Sub '${PredictionsTable.Arn}/index/gsi1'
+      Events:
+        ListPredictions:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Method: GET, Path: /predictions}
+        ListEvents:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Method: GET, Path: /events}
+        UpdateEvent:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Method: PATCH, Path: /events}
+
+  DashboardFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: DashboardLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-dashboard'
+      Handler: dashboard.app.handler
+      Description: Dashboard summary statistics.
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: [dynamodb:Query, dynamodb:GetItem]
+              Resource:
+                - !GetAtt PredictionsTable.Arn
+                - !Sub '${PredictionsTable.Arn}/index/gsi1'
+      Events:
+        Dashboard:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Method: GET, Path: /dashboard}
+
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: HealthLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-health'
+      Handler: health.app.handler
+      MemorySize: 128
+      Description: Liveness check.
+      Events:
+        Health:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Method: GET, Path: /health}
+
+  # ---------- CloudWatch ----------
+  PredictLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: {LogGroupName: !Sub '/aws/lambda/${ProjectName}-predict', RetentionInDays: !Ref LogRetentionDays}
+  HistoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: {LogGroupName: !Sub '/aws/lambda/${ProjectName}-history', RetentionInDays: !Ref LogRetentionDays}
+  DashboardLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: {LogGroupName: !Sub '/aws/lambda/${ProjectName}-dashboard', RetentionInDays: !Ref LogRetentionDays}
+  HealthLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: {LogGroupName: !Sub '/aws/lambda/${ProjectName}-health', RetentionInDays: !Ref LogRetentionDays}
+
+  AlertsSentMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref PredictLogGroup
+      FilterPattern: 'ALERT_SENT'
+      MetricTransformations:
+        - {MetricNamespace: PredictiveMaintenance, MetricName: AlertsSent, MetricValue: '1', DefaultValue: 0}
+
+  PredictionsMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref PredictLogGroup
+      FilterPattern: 'PREDICTION'
+      MetricTransformations:
+        - {MetricNamespace: PredictiveMaintenance, MetricName: Predictions, MetricValue: '1', DefaultValue: 0}
+
+  PredictErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-predict-errors'
+      AlarmDescription: Predict Lambda reported errors.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref PredictFunction}]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+Outputs:
+  ApiUrl:
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  FrontendUrl:
+    Value: !GetAtt FrontendBucket.WebsiteURL
+  DataBucketName:
+    Value: !Ref DataBucket
+  TableName:
+    Value: !Ref PredictionsTable
+  AlertTopicArn:
+    Value: !Ref AlertTopic

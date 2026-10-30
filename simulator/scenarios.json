@@ -1,0 +1,24 @@
+{
+  "normal": {
+    "label": "Normal operation",
+    "description": "Typical speed and torque, low tool wear. Expected to stay low risk.",
+    "machines": [
+      {"machine_id": "SIM-NORMAL-01", "machine_type": "M", "air_temperature": [298.1, 0.5], "temp_delta": [10.5, 0.3], "rotational_speed": [1540, 40], "torque": [40, 3], "tool_wear_start": 10, "tool_wear_per_tick": 2},
+      {"machine_id": "SIM-NORMAL-02", "machine_type": "L", "air_temperature": [299.0, 0.5], "temp_delta": [10.2, 0.3], "rotational_speed": [1500, 40], "torque": [38, 3], "tool_wear_start": 30, "tool_wear_per_tick": 2}
+    ]
+  },
+  "elevated": {
+    "label": "Elevated risk",
+    "description": "Higher torque and advanced tool wear. Expected to drift toward medium/high risk.",
+    "machines": [
+      {"machine_id": "SIM-ELEVATED-01", "machine_type": "M", "air_temperature": [298.5, 0.4], "temp_delta": [9.0, 0.3], "rotational_speed": [1340, 30], "torque": [58, 2], "tool_wear_start": 200, "tool_wear_per_tick": 1}
+    ]
+  },
+  "high": {
+    "label": "High-risk condition",
+    "description": "Heavy torque, low speed, worn tool. Expected to be classified high risk and trigger an alert.",
+    "machines": [
+      {"machine_id": "SIM-HIGH-01", "machine_type": "M", "air_temperature": [298.5, 0.3], "temp_delta": [9.0, 0.2], "rotational_speed": [1300, 20], "torque": [62, 2], "tool_wear_start": 225, "tool_wear_per_tick": 1}
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+# Training, tests and tooling (the Lambda package itself needs no third-party libraries beyond boto3, which Lambda provides)
+scikit-learn==1.5.2
+pandas==2.2.3
+numpy>=1.26,<2.2
+matplotlib>=3.8
+joblib>=1.4
+pytest==8.3.4
+moto[dynamodb,sns,sqs,s3]==5.0.22
+boto3>=1.35
+aws-sam-cli>=1.130
